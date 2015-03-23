@@ -5,16 +5,15 @@
 
 int main(int /*argc*/, char* /*argv*/[])
 {
-	std::array<uint8_t, SHA256_DIGEST_LENGTH> result;
+	std::array<uint8_t, SHA256_DIGEST_LENGTH> data;
+	std::fill(data.begin(), data.end(), 0);
 
-    SHA256CTX sha256;
-    SHA256Init(&sha256);
-    SHA256Update(&sha256, (uint8_t const*)"A", 1);
-    SHA256Final(&sha256, result.data());
+	std::array<uint8_t, SHA256_DIGEST_LENGTH> result;
+	SHA256(data.data(), data.size(), result.data());
 
 	for (size_t i = 0; i < SHA256_DIGEST_LENGTH; ++i)
 	{
-		printf("%2x", result[i]);
+		printf("%02x", result[i]);
 	}
 	printf("\n");
 
