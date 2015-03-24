@@ -1,50 +1,40 @@
 #include <stdint.h>
 #include <stdio.h>
-#include <array>
-#include <arpa/inet.h>
 #include <memory.h>
+#include <arpa/inet.h>
 
-#define SHA256_STATE_LENGTH 8U
-#define SHA256_BLOCK_LENGTH 64U
-#define SHA256_DIGEST_LENGTH 32U
+void SHA256(uint8_t block[64], uint8_t digest[32]);
 
-static inline void be32enc(void* dst, const void* src, size_t len)
+int main(int argc, char* argv[])
 {
-	for (auto d=(uint32_t*)dst,s=(uint32_t*)src;len--;*d++=htonl(*s++));
-}
-
-void SHA256(uint8_t* block, uint8_t digest[SHA256_DIGEST_LENGTH]);
-
-int main(int /*argc*/, char* /*argv*/[])
-{
-	std::array<uint8_t, 64> block = {{
+	uint8_t block[64] = {
 			0,    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
 			0,    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
 			0x80, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
 			0,    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0,
-		}};
+		};
 
-	std::array<uint8_t, SHA256_DIGEST_LENGTH> zeros = {{
-		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-	}};
-	std::array<uint8_t, SHA256_DIGEST_LENGTH> data = {{
-		0x32, 0xc7, 0xdd, 0x4d, 0xa0, 0xd6, 0x1c, 0x46, 0xfd, 0x5f, 0x44, 0x49, 0x2c, 0x11, 0xff, 0x8a,
-		0x87, 0x77, 0xcb, 0x13, 0x4f, 0x95, 0xb1, 0x64, 0xc6, 0xde, 0x4e, 0x9f, 0xfc, 0xbb, 0x5f, 0x0f
-	}};
+	uint8_t zeros[32] = {
+			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+		};
+	uint8_t random[32] = {
+			0x32, 0xc7, 0xdd, 0x4d, 0xa0, 0xd6, 0x1c, 0x46, 0xfd, 0x5f, 0x44, 0x49, 0x2c, 0x11, 0xff, 0x8a,
+			0x87, 0x77, 0xcb, 0x13, 0x4f, 0x95, 0xb1, 0x64, 0xc6, 0xde, 0x4e, 0x9f, 0xfc, 0xbb, 0x5f, 0x0f
+		};
 
-	std::array<uint8_t, SHA256_DIGEST_LENGTH> result;
-	std::copy(zeros.begin(), zeros.end(), block.begin());
-	SHA256(block.data(), result.data());
-	for (size_t i = 0; i < SHA256_DIGEST_LENGTH; ++i)
+	uint8_t result[32];
+	memcpy(block, zeros, 32);
+	SHA256(block, result);
+	for (size_t i = 0; i < 32; ++i)
 	{
 		printf("%02x", result[i]);
 	}
 	printf("\n");
 
-	std::copy(data.begin(), data.end(), block.begin());
-	SHA256(block.data(), result.data());
-	for (size_t i = 0; i < SHA256_DIGEST_LENGTH; ++i)
+	memcpy(block, random, 32);
+	SHA256(block, result);
+	for (size_t i = 0; i < 32; ++i)
 	{
 		printf("%02x", result[i]);
 	}
@@ -53,14 +43,21 @@ int main(int /*argc*/, char* /*argv*/[])
 	return 0;
 }
 
-void SHA256(uint8_t* block, uint8_t digest[SHA256_DIGEST_LENGTH])
+static inline void be32enc(void* dst, const void* src, size_t len)
 {
-	uint32_t state[SHA256_STATE_LENGTH] = {
+	uint32_t* s;
+	uint32_t* d;
+	for (d=(uint32_t*)dst,s=(uint32_t*)src;len--;*d++=htonl(*s++));
+}
+
+void SHA256(uint8_t block[64], uint8_t digest[32])
+{
+	uint32_t state[8] = {
 		0x6A09E667, 0xBB67AE85, 0x3C6EF372, 0xA54FF53A, 0x510E527F, 0x9B05688C, 0x1F83D9AB, 0x5BE0CD19,
 	};
 
 	uint32_t W[64];
-	be32enc(W, block, SHA256_BLOCK_LENGTH >> 2);
+	be32enc(W, block, 16);
 
 	for (int i = 16; i < 64; i++)
 	{
@@ -68,7 +65,7 @@ void SHA256(uint8_t* block, uint8_t digest[SHA256_DIGEST_LENGTH])
 	}
 
 	uint32_t S[8];
-	memcpy(S, state, SHA256_STATE_LENGTH * 4);
+	memcpy(S, state, sizeof(S));
 
 	uint32_t t0, t1;
 	t0 = S[71 % 8] + (((S[68 % 8] >> 6) | (S[68 % 8] << (26))) ^ ((S[68 % 8] >> 11) | (S[68 % 8] << (21))) ^ ((S[68 % 8] >> 25) | (S[68 % 8] << (7)))) + ((S[68 % 8] & (S[69 % 8] ^ S[70 % 8])) ^ S[70 % 8]) + W[ 0] + 0x428a2f98;
@@ -333,6 +330,6 @@ void SHA256(uint8_t* block, uint8_t digest[SHA256_DIGEST_LENGTH])
 		state[i] += S[i];
 	}
 
-	be32enc(digest, state, SHA256_DIGEST_LENGTH >> 2);
+	be32enc(digest, state, 8);
 }
 
