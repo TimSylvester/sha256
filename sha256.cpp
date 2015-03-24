@@ -1,6 +1,8 @@
 #include <stdint.h>
-#include <string.h>
+#include <stdio.h>
+#include <array>
 #include <arpa/inet.h>
+#include <memory.h>
 
 #define SHA256_STATE_LENGTH 8U
 #define SHA256_BLOCK_LENGTH 64U
@@ -11,20 +13,51 @@ static inline void be32enc(void* dst, const void* src, size_t len)
 	for (auto d=(uint32_t*)dst,s=(uint32_t*)src;len--;*d++=htonl(*s++));
 }
 
-static unsigned char const PAD[32] =
-{
-	0x80, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0,
-};
+void SHA256(uint8_t* block, uint8_t digest[SHA256_DIGEST_LENGTH]);
 
-void SHA256(const uint8_t* input, size_t length, uint8_t digest[SHA256_DIGEST_LENGTH])
+int main(int /*argc*/, char* /*argv*/[])
+{
+	std::array<uint8_t, 64> block = {{
+			0,    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+			0,    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+			0x80, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+			0,    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0,
+		}};
+
+	std::array<uint8_t, SHA256_DIGEST_LENGTH> zeros = {{
+		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+	}};
+	std::array<uint8_t, SHA256_DIGEST_LENGTH> data = {{
+		0x32, 0xc7, 0xdd, 0x4d, 0xa0, 0xd6, 0x1c, 0x46, 0xfd, 0x5f, 0x44, 0x49, 0x2c, 0x11, 0xff, 0x8a,
+		0x87, 0x77, 0xcb, 0x13, 0x4f, 0x95, 0xb1, 0x64, 0xc6, 0xde, 0x4e, 0x9f, 0xfc, 0xbb, 0x5f, 0x0f
+	}};
+
+	std::array<uint8_t, SHA256_DIGEST_LENGTH> result;
+	std::copy(zeros.begin(), zeros.end(), block.begin());
+	SHA256(block.data(), result.data());
+	for (size_t i = 0; i < SHA256_DIGEST_LENGTH; ++i)
+	{
+		printf("%02x", result[i]);
+	}
+	printf("\n");
+
+	std::copy(data.begin(), data.end(), block.begin());
+	SHA256(block.data(), result.data());
+	for (size_t i = 0; i < SHA256_DIGEST_LENGTH; ++i)
+	{
+		printf("%02x", result[i]);
+	}
+	printf("\n");
+
+	return 0;
+}
+
+void SHA256(uint8_t* block, uint8_t digest[SHA256_DIGEST_LENGTH])
 {
 	uint32_t state[SHA256_STATE_LENGTH] = {
 		0x6A09E667, 0xBB67AE85, 0x3C6EF372, 0xA54FF53A, 0x510E527F, 0x9B05688C, 0x1F83D9AB, 0x5BE0CD19,
 	};
-
-	uint8_t block[SHA256_BLOCK_LENGTH];
-	memcpy(block, input, 32);
-	memcpy(block + 32, PAD, 32);
 
 	uint32_t W[64];
 	be32enc(W, block, SHA256_BLOCK_LENGTH >> 2);
@@ -38,10 +71,10 @@ void SHA256(const uint8_t* input, size_t length, uint8_t digest[SHA256_DIGEST_LE
 	memcpy(S, state, SHA256_STATE_LENGTH * 4);
 
 	uint32_t t0, t1;
-	t0 = S[(71 - 0) % 8] + (((S[(68 - 0) % 8] >> 6) | (S[(68 - 0) % 8] << (32 - 6))) ^ ((S[(68 - 0) % 8] >> 11) | (S[(68 - 0) % 8] << (32 - 11))) ^ ((S[(68 - 0) % 8] >> 25) | (S[(68 - 0) % 8] << (32 - 25)))) + ((S[(68 - 0) % 8] & (S[(69 - 0) % 8] ^ S[(70 - 0) % 8])) ^ S[(70 - 0) % 8]) + W[ 0] + 0x428a2f98;
-	t1 = (((S[(64 - 0) % 8] >> 2) | (S[(64 - 0) % 8] << (32 - 2))) ^ ((S[(64 - 0) % 8] >> 13) | (S[(64 - 0) % 8] << (32 - 13))) ^ ((S[(64 - 0) % 8] >> 22) | (S[(64 - 0) % 8] << (32 - 22)))) + ((S[(64 - 0) % 8] & (S[(65 - 0) % 8] | S[(66 - 0) % 8])) | (S[(65 - 0) % 8] & S[(66 - 0) % 8]));
-	S[(67 - 0) % 8] += t0;
-	S[(71 - 0) % 8] = t0 + t1;
+	t0 = S[71 % 8] + (((S[68 % 8] >> 6) | (S[68 % 8] << (32 - 6))) ^ ((S[68 % 8] >> 11) | (S[68 % 8] << (32 - 11))) ^ ((S[68 % 8] >> 25) | (S[68 % 8] << (32 - 25)))) + ((S[68 % 8] & (S[69 % 8] ^ S[70 % 8])) ^ S[70 % 8]) + W[ 0] + 0x428a2f98;
+	t1 = (((S[64 % 8] >> 2) | (S[64 % 8] << (32 - 2))) ^ ((S[64 % 8] >> 13) | (S[64 % 8] << (32 - 13))) ^ ((S[64 % 8] >> 22) | (S[64 % 8] << (32 - 22)))) + ((S[64 % 8] & (S[65 % 8] | S[66 % 8])) | (S[65 % 8] & S[66 % 8]));
+	S[67 % 8] += t0;
+	S[71 % 8] = t0 + t1;
 	t0 = S[(71 - 1) % 8] + (((S[(68 - 1) % 8] >> 6) | (S[(68 - 1) % 8] << (32 - 6))) ^ ((S[(68 - 1) % 8] >> 11) | (S[(68 - 1) % 8] << (32 - 11))) ^ ((S[(68 - 1) % 8] >> 25) | (S[(68 - 1) % 8] << (32 - 25)))) + ((S[(68 - 1) % 8] & (S[(69 - 1) % 8] ^ S[(70 - 1) % 8])) ^ S[(70 - 1) % 8]) + W[ 1] + 0x71374491;
 	t1 = (((S[(64 - 1) % 8] >> 2) | (S[(64 - 1) % 8] << (32 - 2))) ^ ((S[(64 - 1) % 8] >> 13) | (S[(64 - 1) % 8] << (32 - 13))) ^ ((S[(64 - 1) % 8] >> 22) | (S[(64 - 1) % 8] << (32 - 22)))) + ((S[(64 - 1) % 8] & (S[(65 - 1) % 8] | S[(66 - 1) % 8])) | (S[(65 - 1) % 8] & S[(66 - 1) % 8]));
 	S[(67 - 1) % 8] += t0;
