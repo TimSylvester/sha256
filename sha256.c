@@ -1,9 +1,11 @@
 #include <stdint.h>
 #include <stdio.h>
-#include <memory.h>
 #include <arpa/inet.h>
 
-void SHA256(uint8_t block[64], uint8_t digest[32]);
+static inline void be32enc(uint32_t* dst, const uint32_t* src, size_t len)
+{
+	for(;len--;*dst++=htonl(*src++));
+}
 
 int main(int argc, char* argv[])
 {
@@ -14,66 +16,21 @@ int main(int argc, char* argv[])
 			0,    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0,
 		};
 
-	uint8_t random[32] = {
-			 0, 0, 0, 0,
-			 255, 255, 0, 0,
-			 31, 255, 251, 0,
-			 144, 102, 121, 0,
-			 196, 134, 225, 1,
-			 225, 189, 25, 150,
-			 117, 4, 145, 146,
-			 247, 128, 22, 5
+	fread(block, 32, 1, stdin);
 
-			//0, 0, 0, 0, 217, 1, 0, 0, 76, 255, 82, 0, 105, 148, 116, 0,
-			//97, 153, 180, 39, 125, 197, 47, 131, 146, 45, 221, 62, 181, 254, 194, 157,
-
-			//0x32, 0xc7, 0xdd, 0x4d, 0xa0, 0xd6, 0x1c, 0x46, 0xfd, 0x5f, 0x44, 0x49, 0x2c, 0x11, 0xff, 0x8a,
-			//0x87, 0x77, 0xcb, 0x13, 0x4f, 0x95, 0xb1, 0x64, 0xc6, 0xde, 0x4e, 0x9f, 0xfc, 0xbb, 0x5f, 0x0f
-		};
-
-	uint8_t result[32];
-	//memcpy(block, zeros, 32);
-	//SHA256(block, result);
-	//for (size_t i = 0; i < 32; ++i)
-	//{
-	//	printf("%02x", result[i]);
-	//}
-	//printf("\n");
-
-	//memcpy(block, random, 32);
-	SHA256(block, result);
-	for (size_t i = 0; i < 32; ++i)
-	{
-		printf("%02x", result[i]);
-	}
-	printf("\n");
-
-	return 0;
-}
-
-static inline void be32enc(void* dst, const void* src, size_t len)
-{
-	uint32_t* s;
-	uint32_t* d;
-	for (d=(uint32_t*)dst,s=(uint32_t*)src;len--;*d++=htonl(*s++));
-}
-
-void SHA256(uint8_t block[64], uint8_t digest[32])
-{
 	uint32_t state[8] = {
 		0x6A09E667, 0xBB67AE85, 0x3C6EF372, 0xA54FF53A, 0x510E527F, 0x9B05688C, 0x1F83D9AB, 0x5BE0CD19,
 	};
 
 	uint32_t W[64];
-	be32enc(W, block, 16);
+	be32enc(W, (uint32_t const*)block, 16);
 
 	for (int i = 16; i < 64; i++)
 	{
 		W[i] = (((W[i - 2] >> 17) | (W[i - 2] << 15)) ^ ((W[i - 2] >> 19) | (W[i - 2] << 13)) ^ (W[i - 2] >> 10)) + W[i - 7] + (((W[i - 15] >> 7) | (W[i - 15] << 25)) ^ ((W[i - 15] >> 18) | (W[i - 15] << 14)) ^ (W[i - 15] >> 3)) + W[i - 16];
 	}
 
-	uint32_t S[8];
-	memcpy(S, state, sizeof(S));
+	uint32_t S[8] = { state[0], state[1], state[2], state[3], state[4], state[5], state[6], state[7] };
 
 	uint32_t t0, t1;
 	t0 = S[7] + (((S[4] >> 6) | (S[4] << 26)) ^ ((S[4] >> 11) | (S[4] << 21)) ^ ((S[4] >> 25) | (S[4] << 7))) + ((S[4] & (S[5] ^ S[6])) ^ S[6]) + W[0] + 0x428a2f98;
@@ -338,6 +295,15 @@ void SHA256(uint8_t block[64], uint8_t digest[32])
 		state[i] += S[i];
 	}
 
-	be32enc(digest, state, 8);
+	uint8_t digest[32];
+	be32enc((uint32_t*)digest, state, 8);
+
+	for (size_t i = 0; i < 32; ++i)
+	{
+		printf("%02x", digest[i]);
+	}
+	printf("\n");
+
+	return 0;
 }
 
